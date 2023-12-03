@@ -1,0 +1,11 @@
+#!/bin/bash
+# alternative to airmong for monitor mode
+ip link set wlan0 down
+sleep 1
+iw wlan0 set type monitor
+sleep 1
+ip link set wlan0 up
+sleep 1
+iwconfig
+sleep 3
+airodump-ng wlan0

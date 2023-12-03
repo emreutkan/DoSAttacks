@@ -19,3 +19,4 @@ README?
 # Temporary Fix to ISSUE-1
 
 - Put the `ALTMON` and `RECMON` scripts before `AutoDeauth` in a single script
+- removed comments, removed airmon for monitoring
