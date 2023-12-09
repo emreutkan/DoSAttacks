@@ -1,6 +1,6 @@
 # Deauthentication Scripts
 
--- each file has in-depth README files... 
+-- each file has(or will have) in-depth README files... 
 
 ## Auto Deauthentication
 - this script usea Aircrack-ng suite to perform deauthentication attack just by the target AP SSID, 
